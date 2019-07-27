@@ -84,6 +84,7 @@ void usage(void)
     fprintf(stderr, "    -l - DispmanX layer number\n");
     fprintf(stderr, "    -x - offset (pixels from the left)\n");
     fprintf(stderr, "    -y - offset (pixels from the top)\n");
+    fprintf(stderr, "    -t - timeout in ms\n");
     fprintf(stderr, "    -n - non-interactive mode\n");
     fprintf(stderr, "    -s - string to display below image\n");
 
@@ -99,6 +100,7 @@ int main(int argc, char *argv[])
     uint32_t displayNumber = 0;
     int32_t xOffset = 0;
     int32_t yOffset = 0;
+    uint32_t timeout = 0;
     bool xOffsetSet = false;
     bool yOffsetSet = false;
     bool interactive = true;
@@ -141,6 +143,11 @@ int main(int argc, char *argv[])
             yOffsetSet = true;
             break;
         
+        case 't':
+
+            timeout = atoi(optarg);
+            break;
+
         case 'n':
 
             interactive = false;
@@ -163,6 +170,31 @@ int main(int argc, char *argv[])
     if (optind >= argc)
     {
         usage();
+    }
+
+    //---------------------------------------------------------------------
+
+    IMAGE_LAYER_T imageLayer;
+
+    const char *imagePath = argv[optind];
+
+    if(strcmp(imagePath, "-") == 0)
+    {
+        // Use stdin
+        if (loadPngFile(&(imageLayer.image), stdin) == false)
+        {
+            fprintf(stderr, "unable to load %s\n", imagePath);
+            exit(EXIT_FAILURE);
+        }
+    }
+    else
+    {
+        // Load image from path
+        if (loadPng(&(imageLayer.image), imagePath) == false)
+        {
+            fprintf(stderr, "unable to load %s\n", imagePath);
+            exit(EXIT_FAILURE);
+        }
     }
 
     //---------------------------------------------------------------------
@@ -218,7 +250,8 @@ int main(int argc, char *argv[])
 
     IMAGE_LAYER_T textLayer;
 
-    if (text) {
+    if (text)
+    {
         initImageLayer(&textLayer, strlen(text)*8, 16, VC_IMAGE_RGBA16);
 
         const RGBA8_T color = { 255, 255, 255, 255 };
@@ -254,10 +287,12 @@ int main(int argc, char *argv[])
                                display,
                                update);
 
-    if (text) {
+    if (text)
+    {
         int x = 0;
 
-        if (8 * strlen(text) < imageLayer.image.width) {
+        if (8 * strlen(text) < imageLayer.image.width)
+        {
             x = imageLayer.image.width / 2 - 4 * strlen(text);
         }
 
@@ -274,6 +309,10 @@ int main(int argc, char *argv[])
     //---------------------------------------------------------------------
 
     int32_t step = 1;
+    uint32_t currentTime = 0;
+
+    // Sleep for 10 milliseconds every run-loop
+    const int sleepMilliseconds = 10;
 
     while (run)
     {
@@ -359,9 +398,15 @@ int main(int argc, char *argv[])
                 assert(result == 0);
             }
         }
-        else
+
+        //---------------------------------------------------------------------
+
+        usleep(sleepMilliseconds * 1000);
+
+        currentTime += sleepMilliseconds;
+        if (timeout != 0 && currentTime >= timeout)
         {
-            usleep(100000);
+            run = false;
         }
     }
 
@@ -377,7 +422,8 @@ int main(int argc, char *argv[])
     }
 
     destroyImageLayer(&imageLayer);
-    if (text) {
+    if (text)
+    {
         destroyImageLayer(&textLayer);
     }
 
