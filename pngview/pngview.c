@@ -238,7 +238,6 @@ int main(int argc, char *argv[])
         initBackgroundLayer(&backgroundLayer, background, 0);
     }
 
-    IMAGE_LAYER_T imageLayer;
     if (loadPng(&(imageLayer.image), argv[optind]) == false)
     {
         fprintf(stderr, "unable to load %s\n", argv[optind]);
