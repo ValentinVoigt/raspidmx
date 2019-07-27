@@ -39,6 +39,7 @@
 #include "imageLayer.h"
 #include "key.h"
 #include "loadpng.h"
+#include "font.h"
 
 #include "bcm_host.h"
 
@@ -76,7 +77,7 @@ void usage(void)
 {
     fprintf(stderr, "Usage: %s ", program);
     fprintf(stderr, "[-b <RGBA>] [-d <number>] [-l <layer>] ");
-    fprintf(stderr, "[-x <offset>] [-y <offset>] <file.png>\n");
+    fprintf(stderr, "[-x <offset>] [-y <offset>] [-s <text>] <file.png>\n");
     fprintf(stderr, "    -b - set background colour 16 bit RGBA\n");
     fprintf(stderr, "         e.g. 0x000F is opaque black\n");
     fprintf(stderr, "    -d - Raspberry Pi display number\n");
@@ -84,6 +85,7 @@ void usage(void)
     fprintf(stderr, "    -x - offset (pixels from the left)\n");
     fprintf(stderr, "    -y - offset (pixels from the top)\n");
     fprintf(stderr, "    -n - non-interactive mode\n");
+    fprintf(stderr, "    -s - string to display below image\n");
 
     exit(EXIT_FAILURE);
 }
@@ -100,6 +102,7 @@ int main(int argc, char *argv[])
     bool xOffsetSet = false;
     bool yOffsetSet = false;
     bool interactive = true;
+    char* text = NULL;
 
     program = basename(argv[0]);
 
@@ -107,7 +110,7 @@ int main(int argc, char *argv[])
 
     int opt = 0;
 
-    while ((opt = getopt(argc, argv, "b:d:l:x:y:n")) != -1)
+    while ((opt = getopt(argc, argv, "b:d:l:x:y:ns:")) != -1)
     {
         switch(opt)
         {
@@ -141,6 +144,11 @@ int main(int argc, char *argv[])
         case 'n':
 
             interactive = false;
+            break;
+
+        case 's':
+
+            text= strdup(optarg);
             break;
 
         default:
@@ -203,7 +211,22 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "unable to load %s\n", argv[optind]);
     }
+
     createResourceImageLayer(&imageLayer, layer);
+
+    //---------------------------------------------------------------------
+
+    IMAGE_LAYER_T textLayer;
+
+    if (text) {
+        initImageLayer(&textLayer, strlen(text)*8, 16, VC_IMAGE_RGBA16);
+
+        const RGBA8_T color = { 255, 255, 255, 255 };
+
+        drawStringRGB(0, 0, text, &color, &(textLayer.image));
+
+        createResourceImageLayer(&textLayer, layer+1);
+    }
 
     //---------------------------------------------------------------------
 
@@ -230,6 +253,20 @@ int main(int argc, char *argv[])
                                yOffset,
                                display,
                                update);
+
+    if (text) {
+        int x = 0;
+
+        if (8 * strlen(text) < imageLayer.image.width) {
+            x = imageLayer.image.width / 2 - 4 * strlen(text);
+        }
+
+        addElementImageLayerOffset(&textLayer,
+                                   xOffset + x,
+                                   yOffset + imageLayer.image.height,
+                                   display,
+                                   update);
+    }
 
     result = vc_dispmanx_update_submit_sync(update);
     assert(result == 0);
@@ -340,6 +377,9 @@ int main(int argc, char *argv[])
     }
 
     destroyImageLayer(&imageLayer);
+    if (text) {
+        destroyImageLayer(&textLayer);
+    }
 
     //---------------------------------------------------------------------
 
